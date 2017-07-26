@@ -1,2 +1,0 @@
-int size
-KeyPoint[] keypoints

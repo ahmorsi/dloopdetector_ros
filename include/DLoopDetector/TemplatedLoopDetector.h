@@ -270,6 +270,14 @@ public:
    */
   inline void clear();
 
+  /**
+   * Returns the loop detector Parameters
+   * @return loop detector Parameters
+   */
+  inline Parameters getParams() const
+  {
+      return m_params;
+  }
 protected:
   
   /// Matching island

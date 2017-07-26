@@ -23,18 +23,23 @@
 // Demo
 #include "demoDetector.h"
 
+//msg
+#include "dloopdetector/FeaturesWithKeyPoints.h"
+#include "dloopdetector/KeyPoint.h"
+#include "ros/ros.h"
 using namespace DLoopDetector;
 using namespace DBoW2;
 using namespace std;
 
 // ----------------------------------------------------------------------------
 
-static const char *VOC_FILE = "/resources/surf64_k10L6.voc.gz";
+static const char *VOC_FILE = "/resources/vprice_cnn_voc_K10L4.txt";
 static const char *IMAGE_DIR = "/resources/images";
 static const char *POSE_FILE = "/resources/pose.txt";
-static const int IMAGE_W = 640; // image size
-static const int IMAGE_H = 480;
+static const int IMAGE_W = 224; // image size
+static const int IMAGE_H = 224;
 
+demoDetector<CnnVocabulary, CnnLoopDetector, FCNN::TDescriptor> *demo;
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 /// This functor extracts SURF64 descriptors in the required format
@@ -49,25 +54,33 @@ public:
    */
   virtual void operator()(const cv::Mat &im,
     vector<cv::KeyPoint> &keys, vector<vector<float> > &descriptors) const;
+
+
 };
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+int cnt = 0;
+void extractor_callback(const dloopdetector::FeaturesWithKeyPoints::ConstPtr& msg);
 
-int main()
+int main(int argc, char **argv)
 {
+  ros::init(argc, argv, "cnn_dloopdetector");
+  ros::NodeHandle n;
+
   std::string path = ros::package::getPath("dloopdetector");
   std::string voc_file = path + VOC_FILE;
   std::string image_dir = path + IMAGE_DIR;
   std::string pose_file = path + POSE_FILE;
     // prepares the demo
-  demoDetector<Surf64Vocabulary, Surf64LoopDetector, FSurf64::TDescriptor>
-    demo(voc_file.c_str(), image_dir.c_str(), pose_file.c_str(), IMAGE_W, IMAGE_H);
-
+    demo = new demoDetector<CnnVocabulary, CnnLoopDetector, FCNN::TDescriptor>(voc_file.c_str(), image_dir.c_str(), pose_file.c_str(), IMAGE_W, IMAGE_H);
+    demo->init("CNN");
   try
   {
     // run the demo with the given functor to extract features
-    SurfExtractor extractor;
-    demo.run("SURF64", extractor);
+    //CnnExtractor extractor;
+    //demo.run("CNN", extractor);
+    ros::Subscriber sub = n.subscribe("/features", 1000, extractor_callback);
+    ros::spin();
   }
   catch(const std::string &ex)
   {
@@ -105,5 +118,25 @@ void CnnExtractor::operator() (const cv::Mat &im,
 }
 
 // ----------------------------------------------------------------------------
-
+void extractor_callback(const dloopdetector::FeaturesWithKeyPoints::ConstPtr &msg)
+{
+    vector<cv::KeyPoint> keys;
+    for(std::vector<dloopdetector::KeyPoint>::const_iterator kp = msg -> keypoints.begin();
+        kp != msg-> keypoints.end(); ++ kp)
+    {
+        keys.push_back(cv::KeyPoint(kp->x,kp->y,kp->size));
+    }
+    int rows = msg -> features.layout.dim[0].size;
+    int cols = msg -> features.layout.dim[1].size;
+    const std::vector<double> data_1d = msg->features.data;
+    std::vector<FCNN::TDescriptor> descriptors;
+    descriptors.resize(rows);
+    for(int i = 0;i<rows;++i) {
+        descriptors[i].resize(cols);
+        int offset = i*cols;
+        std::copy(data_1d.begin()+offset,data_1d.begin() + offset + cols,descriptors[i].begin());
+    }
+    demo->runOnImage(keys,descriptors);
+    cout<<++ cnt << "-> "<<keys.size()<<' '<< descriptors.size()<<'-'<< descriptors[0].size()<<std::endl;
+}
 

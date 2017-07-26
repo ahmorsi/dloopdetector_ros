@@ -57,16 +57,16 @@ find_package(catkin REQUIRED COMPONENTS
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+add_message_files(
+   FILES
+  KeyPoint.msg
+  FeaturesWithKeyPoints.msg
+ )
 
 ## Generate services in the 'srv' folder
-add_service_files(
-   FILES
-   ExtractCnnFeatures.srv
+#add_service_files(
+#   FILES
+#   ExtractCnnFeatures.srv
 # )
 
 ## Generate actions in the 'action' folder
@@ -82,10 +82,7 @@ generate_messages(
    std_msgs
   sensor_msgs
   geometry_msgs
-  KeyPoint
-  KeyPointArray
-  FeaturesWithKeyPoints
-# )
+ )
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -171,6 +168,9 @@ if(BUILD_DemoBRIEF OR BUILD_DemoSURF)
     message("Demo resources are not going to be downloaded unless the option is activated. Demo applications will not work")
   endif(DOWNLOAD_Demo_Resources)
 endif(BUILD_DemoBRIEF OR BUILD_DemoSURF)
+
+add_executable(demo_cnn src/demo_cnn.cpp)
+target_link_libraries(demo_cnn ${OpenCV_LIBS} ${DLib_LIBS} ${DBoW2_LIBS} ${catkin_LIBRARIES})
 
 configure_file(src/DLoopDetector.cmake.in
   "${PROJECT_BINARY_DIR}/DLoopDetectorConfig.cmake" @ONLY)

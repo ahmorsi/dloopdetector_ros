@@ -1,2 +1,2 @@
 std_msgs/Float64MultiArray features
-KeyPointArray keypoints
+KeyPoint[] keypoints
