@@ -76,7 +76,7 @@ struct DetectionResult
   EntryId query;
   /// Matched id if loop detected, otherwise, best candidate 
   EntryId match;
-  
+
   /**
    * Checks if the loop was detected
    * @return true iff a loop was detected
@@ -85,6 +85,18 @@ struct DetectionResult
   {
     return status == LOOP_DETECTED;
   }
+};
+
+/// KeyPointMap Structure
+struct KeyPointMap
+{
+    std::vector<cv::KeyPoint> local_keypoints;
+    uint32_t size() const { return local_keypoints.size();}
+    cv::KeyPoint getKeyPoint(int ind) const {return local_keypoints[ind];}
+    KeyPointMap(cv::KeyPoint keypoint)
+    {
+        local_keypoints.push_back(keypoint);
+    }
 };
 
 /// TDescriptor: class of descriptor
@@ -265,6 +277,18 @@ public:
     DetectionResult &match);
 
   /**
+   * Adds the given tuple <keys, descriptors, current_t> to the database
+   * and returns the match if any
+   * @param keys keypointsMap of the image
+   * @param descriptors descriptors associated to the given keypoints
+   * @param match (out) match or failing information
+   * @return true iff there was match
+   */
+  bool detectLoop(const std::vector<KeyPointMap> &keymaps,
+    const std::vector<TDescriptor> &descriptors,
+    DetectionResult &match);
+
+  /**
    * Resets the detector and clears the database, such that the next entry
    * will be 0 again
    */
@@ -394,7 +418,6 @@ protected:
     tTemporalWindow(): nentries(0) {}
   };
   
-  
 protected:
   
   /**
@@ -444,12 +467,12 @@ protected:
    * Check if an old entry is geometrically consistent (by calculating a 
    * fundamental matrix) with the given set of keys and descriptors
    * @param old_entry entry id of the stored image to check
-   * @param keys current keypoints
+   * @param keymaps current keypointmaps
    * @param descriptors current descriptors associated to the given keypoints
    * @param curvec feature vector of the current entry 
    */
   bool isGeometricallyConsistent_DI(EntryId old_entry, 
-    const std::vector<cv::KeyPoint> &keys, 
+    const std::vector<KeyPointMap> &keymaps,
     const std::vector<TDescriptor> &descriptors, 
     const FeatureVector &curvec) const;
   
@@ -458,12 +481,12 @@ protected:
    * computing an essential matrix by using the neighbour ratio 0.6) 
    * with the given set of keys and descriptors
    * @param old_entry entry id of the stored image to check
-   * @param keys current keypoints
+   * @param keymaps current keypointmaps
    * @param descriptors current descriptors
    * @param flann_structure flann structure with the descriptors of the current entry
    */
   bool isGeometricallyConsistent_Flann(EntryId old_entry,
-    const std::vector<cv::KeyPoint> &keys, 
+    const std::vector<KeyPointMap> &keymaps,
     const std::vector<TDescriptor> &descriptors,
     cv::FlannBasedMatcher &flann_structure) const;
 
@@ -480,15 +503,15 @@ protected:
    * fundamental matrix from left-right correspondences) with the given set 
    * of keys and descriptors,
    * without using the direct index
-   * @param old_keys keys of old entry
+   * @param old_keymaps keymaps of old entry
    * @param old_descriptors descriptors of old keys
-   * @param cur_keys keys of current entry
+   * @param cur_keymaps keymaps of current entry
    * @param cur_descriptors descriptors of cur keys
    */
   bool isGeometricallyConsistent_Exhaustive(
-    const std::vector<cv::KeyPoint> &old_keys,
+    const std::vector<KeyPointMap> &old_keymaps,
     const std::vector<TDescriptor> &old_descriptors,
-    const std::vector<cv::KeyPoint> &cur_keys,
+    const std::vector<KeyPointMap> &cur_keymaps,
     const std::vector<TDescriptor> &cur_descriptors) const; 
 
   /**
@@ -506,6 +529,17 @@ protected:
     const vector<unsigned int> &i_B,
     vector<unsigned int> &i_match_A, vector<unsigned int> &i_match_B) const;
 
+//  /**
+//   * Convert KeyPointMaps to Flatten list of KeyPoints
+//   * Also duplicate desciptors based size of every KeyPointMap
+//   * @param keymaps set of KeyPointMaps
+//   * @param descriptors set of descriptors
+//   * @param out_keys output flatten keypoints
+//   * @param out_descriptors output of duplicated descriptors
+//   */
+//  void convertKeymap_to_Keypoints(const std::vector<KeyPointMap> &keymaps,
+//                                  const std::vector<TDescriptor> &descriptors,
+//    vector<cv::KeyPoint> &out_keys, vector<TDescriptor> &out_descriptors) const;
 protected:
 
   /// Database
@@ -514,7 +548,7 @@ protected:
   
   /// KeyPoints of images
   vector<vector<cv::KeyPoint> > m_image_keys;
-  
+  vector<vector<KeyPointMap>> m_image_keymaps;
   /// Descriptors of images
   vector<vector<TDescriptor> > m_image_descriptors;
   
@@ -661,10 +695,11 @@ void TemplatedLoopDetector<TDescriptor,F>::allocate
   (int nentries, int nkeys)
 {
   const int sz = (const int)m_image_keys.size();
-  
+  //TODO - Get size of KeyPointsMap vector
   if(sz < nentries)
   {
-    m_image_keys.resize(nentries);
+    //m_image_keys.resize(nentries);
+    m_image_keymaps.resize(nentries);//TODO - Reserve KeyPointsMap vector
     m_image_descriptors.resize(nentries);
   }
   
@@ -672,7 +707,8 @@ void TemplatedLoopDetector<TDescriptor,F>::allocate
   {
     for(int i = sz; i < nentries; ++i)
     {
-      m_image_keys[i].reserve(nkeys);
+      //m_image_keys[i].reserve(nkeys);
+      m_image_keymaps[i].reserve(nkeys);//TODO - Reserve KeyPointsMap vector
       m_image_descriptors[i].reserve(nkeys);
     }
   }
@@ -850,11 +886,13 @@ bool TemplatedLoopDetector<TDescriptor, F>::detectLoop(
   if(m_image_keys.size() == entry_id)
   {
     m_image_keys.push_back(keys);
+    //add KeyPointMaps
     m_image_descriptors.push_back(descriptors);
   }
   else
   {
     m_image_keys[entry_id] = keys;
+    //assign KeyPointMaps for descriptors
     m_image_descriptors[entry_id] = descriptors;
   }
   
@@ -865,6 +903,175 @@ bool TemplatedLoopDetector<TDescriptor, F>::detectLoop(
   }
 
   return match.detection();
+}
+
+template<class TDescriptor, class F>
+bool TemplatedLoopDetector<TDescriptor, F>::detectLoop(const std::vector<DLoopDetector::KeyPointMap> &keymaps,
+                                                       const std::vector<TDescriptor> &descriptors,
+                                                       DetectionResult &match)
+{
+
+    EntryId entry_id = m_database->size();
+    match.query = entry_id;
+
+    BowVector bowvec;
+    FeatureVector featvec;
+
+    if(m_params.geom_check == GEOM_DI)
+      m_database->getVocabulary()->transform(descriptors, bowvec, featvec,
+        m_params.di_levels);
+    else
+      m_database->getVocabulary()->transform(descriptors, bowvec);
+
+    if((int)entry_id <= m_params.dislocal)
+    {
+      // only add the entry to the database and finish
+      m_database->add(bowvec, featvec);
+      match.status = CLOSE_MATCHES_ONLY;
+    }
+    else
+    {
+      int max_id = (int)entry_id - m_params.dislocal;
+
+      QueryResults qret;
+      m_database->query(bowvec, qret, m_params.max_db_results, max_id);
+
+      // update database
+      m_database->add(bowvec, featvec); // returns entry_id
+
+      if(!qret.empty())
+      {
+        // factor to compute normalized similarity score, if necessary
+        double ns_factor = 1.0;
+
+        if(m_params.use_nss)
+        {
+          ns_factor = m_database->getVocabulary()->score(bowvec, m_last_bowvec);
+        }
+
+        if(!m_params.use_nss || ns_factor >= m_params.min_nss_factor)
+        {
+          // scores in qret must be divided by ns_factor to obtain the
+          // normalized similarity score, but we can
+          // speed this up by moving ns_factor to alpha's
+
+          // remove those scores whose nss is lower than alpha
+          // (ret is sorted in descending score order now)
+          removeLowScores(qret, m_params.alpha * ns_factor);
+
+          if(!qret.empty())
+          {
+            // the best candidate is the one with highest score by now
+            match.match = qret[0].Id;
+
+            // compute islands
+            vector<tIsland> islands;
+            computeIslands(qret, islands);
+            // this modifies qret and changes the score order
+
+            // get best island
+            if(!islands.empty())
+            {
+              const tIsland& island =
+                *std::max_element(islands.begin(), islands.end());
+
+              // check temporal consistency of this island
+              updateTemporalWindow(island, entry_id);
+
+              // get the best candidate (maybe match)
+              match.match = island.best_entry;
+
+              if(getConsistentEntries() > m_params.k)
+              {
+                // candidate loop detected
+                // check geometry
+                bool detection;
+
+                if(m_params.geom_check == GEOM_DI)
+                {
+                  // all the DI stuff is implicit in the database
+                  detection = isGeometricallyConsistent_DI(island.best_entry,
+                    keymaps, descriptors, featvec);
+                }
+                else if(m_params.geom_check == GEOM_FLANN)
+                {
+                  cv::FlannBasedMatcher flann_structure;
+                  getFlannStructure(descriptors, flann_structure);
+
+                  detection = isGeometricallyConsistent_Flann(island.best_entry,
+                    keymaps, descriptors, flann_structure);
+                }
+                else if(m_params.geom_check == GEOM_EXHAUSTIVE)
+                {
+                  detection = isGeometricallyConsistent_Exhaustive(
+                    m_image_keymaps[island.best_entry],
+                    m_image_descriptors[island.best_entry],
+                    keymaps, descriptors);
+                }
+                else // GEOM_NONE, accept the match
+                {
+                  detection = true;
+                }
+
+                if(detection)
+                {
+                  match.status = LOOP_DETECTED;
+                }
+                else
+                {
+                  match.status = NO_GEOMETRICAL_CONSISTENCY;
+                }
+
+              } // if enough temporal matches
+              else
+              {
+                match.status = NO_TEMPORAL_CONSISTENCY;
+              }
+
+            } // if there is some island
+            else
+            {
+              match.status = NO_GROUPS;
+            }
+          } // if !qret empty after removing low scores
+          else
+          {
+            match.status = LOW_SCORES;
+          }
+        } // if (ns_factor > min normal score)
+        else
+        {
+          match.status = LOW_NSS_FACTOR;
+        }
+      } // if(!qret.empty())
+      else
+      {
+        match.status = NO_DB_RESULTS;
+      }
+    }
+
+    // update record
+    // m_image_keymaps and m_image_descriptors have the same length
+    if(m_image_keymaps.size() == entry_id)
+    {
+      m_image_keymaps.push_back(keymaps);
+      //add KeyPointMaps
+      m_image_descriptors.push_back(descriptors);
+    }
+    else
+    {
+      m_image_keymaps[entry_id] = keymaps;
+      //assign KeyPointMaps for descriptors
+      m_image_descriptors[entry_id] = descriptors;
+    }
+
+    // store this bowvec if we are going to use it in next iteratons
+    if(m_params.use_nss && (int)entry_id + 1 > m_params.dislocal)
+    {
+      m_last_bowvec = bowvec;
+    }
+
+    return match.detection();
 }
 
 // --------------------------------------------------------------------------
@@ -1011,7 +1218,7 @@ void TemplatedLoopDetector<TDescriptor, F>::updateTemporalWindow
 
 template<class TDescriptor, class F>
 bool TemplatedLoopDetector<TDescriptor, F>::isGeometricallyConsistent_DI(
-  EntryId old_entry, const std::vector<cv::KeyPoint> &keys, 
+  EntryId old_entry, const std::vector<KeyPointMap> &keymaps,
   const std::vector<TDescriptor> &descriptors, 
   const FeatureVector &bowvec) const
 {
@@ -1075,11 +1282,19 @@ bool TemplatedLoopDetector<TDescriptor, F>::isGeometricallyConsistent_DI(
     
     for(; oit != i_old.end(); ++oit, ++cit)
     {
-      const cv::KeyPoint &old_k = m_image_keys[old_entry][*oit];
-      const cv::KeyPoint &cur_k = keys[*cit];
+      //const cv::KeyPoint &old_k = m_image_keys[old_entry][*oit];
+      //const cv::KeyPoint &cur_k = keys[*cit];
       
-      old_points.push_back(old_k.pt);
-      cur_points.push_back(cur_k.pt);
+      const KeyPointMap &old_kmap = m_image_keymaps[old_entry][*oit];
+      const KeyPointMap &cur_kmap = keymaps[*cit];
+
+      for(int i=0;i < old_kmap.size();++i){
+          old_points.push_back(old_kmap.getKeyPoint(i).pt);
+          for(int j=0;j < cur_kmap.size();++j)
+              cur_points.push_back(cur_kmap.getKeyPoint(j).pt);
+      }
+      //old_points.push_back(old_k.pt);
+      //cur_points.push_back(cur_k.pt);
     }
   
     cv::Mat oldMat(old_points.size(), 2, CV_32F, &old_points[0]);
@@ -1098,23 +1313,23 @@ bool TemplatedLoopDetector<TDescriptor, F>::isGeometricallyConsistent_DI(
 template<class TDescriptor, class F>
 bool TemplatedLoopDetector<TDescriptor, F>::
 isGeometricallyConsistent_Exhaustive(
-  const std::vector<cv::KeyPoint> &old_keys,
+  const std::vector<KeyPointMap> &old_keymaps,
   const std::vector<TDescriptor> &old_descriptors,
-  const std::vector<cv::KeyPoint> &cur_keys,
+  const std::vector<KeyPointMap> &cur_keymaps,
   const std::vector<TDescriptor> &cur_descriptors) const
 {
   vector<unsigned int> i_old, i_cur;
   vector<unsigned int> i_all_old, i_all_cur;
   
-  i_all_old.reserve(old_keys.size());
-  i_all_cur.reserve(cur_keys.size());
+  i_all_old.reserve(old_keymaps.size());
+  i_all_cur.reserve(cur_keymaps.size());
   
-  for(unsigned int i = 0; i < old_keys.size(); ++i)
+  for(unsigned int i = 0; i < old_keymaps.size(); ++i)
   {
     i_all_old.push_back(i);
   }
   
-  for(unsigned int i = 0; i < cur_keys.size(); ++i)
+  for(unsigned int i = 0; i < cur_keymaps.size(); ++i)
   {
     i_all_cur.push_back(i);
   }
@@ -1130,16 +1345,25 @@ isGeometricallyConsistent_Exhaustive(
     cit = i_cur.begin();
     
     vector<cv::Point2f> old_points, cur_points;
-    old_points.reserve(i_old.size());
-    cur_points.reserve(i_cur.size());
+    //old_points.reserve(i_old.size());
+    //cur_points.reserve(i_cur.size());
     
     for(; oit != i_old.end(); ++oit, ++cit)
     {
-      const cv::KeyPoint &old_k = old_keys[*oit];
-      const cv::KeyPoint &cur_k = cur_keys[*cit];
+      //const cv::KeyPoint &old_k = old_keys[*oit];
+      //const cv::KeyPoint &cur_k = cur_keys[*cit];
       
-      old_points.push_back(old_k.pt);
-      cur_points.push_back(cur_k.pt);
+      const KeyPointMap &old_kmap = old_keymaps[*oit];
+      const KeyPointMap &cur_kmap = cur_keymaps[*oit];
+
+
+      for(int i=0;i < old_kmap.size();++i){
+          old_points.push_back(old_kmap.getKeyPoint(i).pt);
+          for(int j=0;j < cur_kmap.size();++j)
+              cur_points.push_back(cur_kmap.getKeyPoint(j).pt);
+      }
+      //old_points.push_back(old_k.pt);
+      //cur_points.push_back(cur_k.pt);
     }
   
     cv::Mat oldMat(old_points.size(), 2, CV_32F, &old_points[0]);
@@ -1173,15 +1397,15 @@ void TemplatedLoopDetector<TDescriptor, F>::getFlannStructure(
 template<class TDescriptor, class F>
 bool TemplatedLoopDetector<TDescriptor, F>::isGeometricallyConsistent_Flann
   (EntryId old_entry,
-  const std::vector<cv::KeyPoint> &keys, 
+  const std::vector<KeyPointMap> &keymaps,
   const std::vector<TDescriptor> &descriptors,
   cv::FlannBasedMatcher &flann_structure) const
 {
   vector<unsigned int> i_old, i_cur; // indices of correspondences
   
-  const vector<cv::KeyPoint>& old_keys = m_image_keys[old_entry];
+  const vector<KeyPointMap>& old_keymaps = m_image_keymaps[old_entry];
   const vector<TDescriptor>& old_descs = m_image_descriptors[old_entry];
-  const vector<cv::KeyPoint>& cur_keys = keys;
+  const vector<KeyPointMap>& cur_keymaps = keymaps;
   
   vector<cv::Mat> queryDescs_v(1);
   F::toMat32F(old_descs, queryDescs_v[0]);
@@ -1234,16 +1458,26 @@ bool TemplatedLoopDetector<TDescriptor, F>::isGeometricallyConsistent_Flann
     cit = i_cur.begin();
     
     vector<cv::Point2f> old_points, cur_points;
-    old_points.reserve(i_old.size());
-    cur_points.reserve(i_cur.size());
+    //old_points.reserve(i_old.size());
+    //cur_points.reserve(i_cur.size());
     
     for(; oit != i_old.end(); ++oit, ++cit)
     {
-      const cv::KeyPoint &old_k = old_keys[*oit];
-      const cv::KeyPoint &cur_k = cur_keys[*cit];
+      //const cv::KeyPoint &old_k = old_keys[*oit];
+      //const cv::KeyPoint &cur_k = cur_keys[*cit];
       
-      old_points.push_back(old_k.pt);
-      cur_points.push_back(cur_k.pt);
+      const KeyPointMap &old_kmap = old_keymaps[*oit];
+      const KeyPointMap &cur_kmap = cur_keymaps[*oit];
+
+
+      for(int i=0;i < old_kmap.size();++i){
+          old_points.push_back(old_kmap.getKeyPoint(i).pt);
+          for(int j=0;j < cur_kmap.size();++j)
+              cur_points.push_back(cur_kmap.getKeyPoint(j).pt);
+      }
+
+      //old_points.push_back(old_k.pt);
+      //cur_points.push_back(cur_k.pt);
     }
     
     cv::Mat oldMat(old_points.size(), 2, CV_32F, &old_points[0]);

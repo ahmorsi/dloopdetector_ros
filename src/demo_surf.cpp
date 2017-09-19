@@ -48,7 +48,7 @@ public:
    * @param descriptors descriptors extracted
    */
   virtual void operator()(const cv::Mat &im, 
-    vector<cv::KeyPoint> &keys, vector<vector<float> > &descriptors) const;
+    vector<cv::KeyPoint> &keys,vector<DLoopDetector::KeyPointMap> &keymaps, vector<vector<float> > &descriptors) const;
 };
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
@@ -80,7 +80,7 @@ int main()
 // ----------------------------------------------------------------------------
 
 void SurfExtractor::operator() (const cv::Mat &im, 
-  vector<cv::KeyPoint> &keys, vector<vector<float> > &descriptors) const
+  vector<cv::KeyPoint> &keys,vector<DLoopDetector::KeyPointMap> &keymaps, vector<vector<float> > &descriptors) const
 {
   // extract surfs with opencv
   static cv::Ptr<cv::xfeatures2d::SURF> surf_detector = 
@@ -89,9 +89,14 @@ void SurfExtractor::operator() (const cv::Mat &im,
   surf_detector->setExtended(false);
   
   keys.clear(); // opencv 2.4 does not clear the vector
+  keymaps.clear();
   vector<float> plain;
   surf_detector->detectAndCompute(im, cv::Mat(), keys, plain);
   
+  // construct KeyPointMaps
+  for(int i=0;i<keys.size();++i)
+      keymaps.push_back(DLoopDetector::KeyPointMap(keys[i]));
+
   // change descriptor format
   const int L = surf_detector->descriptorSize();
   descriptors.resize(plain.size() / L);

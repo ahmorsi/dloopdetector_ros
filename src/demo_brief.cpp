@@ -48,7 +48,7 @@ public:
    * @param descriptors descriptors extracted
    */
   virtual void operator()(const cv::Mat &im, 
-    vector<cv::KeyPoint> &keys, vector<BRIEF::bitset> &descriptors) const;
+    vector<cv::KeyPoint> &keys,vector<DLoopDetector::KeyPointMap> &keymaps, vector<BRIEF::bitset> &descriptors) const;
 
   /**
    * Creates the brief extractor with the given pattern file
@@ -114,14 +114,20 @@ BriefExtractor::BriefExtractor(const std::string &pattern_file)
 // ----------------------------------------------------------------------------
 
 void BriefExtractor::operator() (const cv::Mat &im, 
-  vector<cv::KeyPoint> &keys, vector<BRIEF::bitset> &descriptors) const
+  vector<cv::KeyPoint> &keys,vector<DLoopDetector::KeyPointMap> &keymaps, vector<BRIEF::bitset> &descriptors) const
 {
+  keys.clear();
+  keymaps.clear();
   // extract FAST keypoints with opencv
   const int fast_th = 20; // corner detector response threshold
   cv::FAST(im, keys, fast_th, true);
   
   // compute their BRIEF descriptor
   m_brief.compute(im, keys, descriptors);
+
+  // construct KeyPointMaps
+  for(int i=0;i<keys.size();++i)
+      keymaps.push_back(DLoopDetector::KeyPointMap(keys[i]));
 }
 
 // ----------------------------------------------------------------------------

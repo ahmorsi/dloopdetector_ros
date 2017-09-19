@@ -43,7 +43,7 @@ public:
    * @param descriptors descriptors extracted
    */
   virtual void operator()(const cv::Mat &im, 
-    vector<cv::KeyPoint> &keys, vector<TDescriptor> &descriptors) const = 0;
+    vector<cv::KeyPoint> &keys,vector<DLoopDetector::KeyPointMap> &keymaps, vector<TDescriptor> &descriptors) const = 0;
 };
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
@@ -83,6 +83,7 @@ public:
    * @param extractor functor to extract features
    */
   void runOnImage(vector<cv::KeyPoint> keys,
+  vector<DLoopDetector::KeyPointMap> keymaps,
   vector<TDescriptor> descriptors);
 
   /**
@@ -146,10 +147,10 @@ void demoDetector<TVocabulary, TDetector, TDescriptor>::init(const string &name)
 
     // We are going to change these values individually:
     params.use_nss = true; // use normalized similarity score instead of raw score
-    params.alpha = 0.3; // nss threshold
+    params.alpha = 0.5; // nss threshold
     params.k = 1; // a loop must be consistent with 1 previous matches
-    params.geom_check = GEOM_NONE; // use direct index for geometrical checking
-    params.di_levels = 2; // use two direct index levels
+    params.geom_check = GEOM_DI; // use direct index for geometrical checking
+    params.di_levels = 1; // use two direct index levels
 
     // To verify loops you can select one of the next geometrical checkings:
     // GEOM_EXHAUSTIVE: correspondence points are computed by comparing all
@@ -179,7 +180,8 @@ void demoDetector<TVocabulary, TDetector, TDescriptor>::init(const string &name)
     cout << "Loading " << name << " vocabulary..." << endl;
     TVocabulary voc;
     voc.loadFromTextFile(m_vocfile);
-    cout<<"Vocab Loaded\n";
+    cout << "Vocabulary information: " << endl
+         << voc << endl << endl;
     m_detector = new TDetector(voc, params);
 
     // prepare visualization windows
@@ -197,7 +199,7 @@ void demoDetector<TVocabulary, TDetector, TDescriptor>::init(const string &name)
 
 }
 template<class TVocabulary, class TDetector, class TDescriptor>
-void demoDetector<TVocabulary, TDetector, TDescriptor>::runOnImage(vector<cv::KeyPoint> keys, vector<TDescriptor> descriptors)
+void demoDetector<TVocabulary, TDetector, TDescriptor>::runOnImage(vector<cv::KeyPoint> keys,vector<DLoopDetector::KeyPointMap> keymaps, vector<TDescriptor> descriptors)
 {
     // add image to the collection and check if there is some loop
     DetectionResult result;
@@ -206,7 +208,7 @@ void demoDetector<TVocabulary, TDetector, TDescriptor>::runOnImage(vector<cv::Ke
     DUtils::Profiler profiler;
 
     profiler.profile("detection");
-    m_detector -> detectLoop(keys, descriptors, result);
+    m_detector -> detectLoop(keymaps, descriptors, result);
     profiler.stop();
 
     typename TDetector::Parameters params = m_detector->getParams();
@@ -214,7 +216,7 @@ void demoDetector<TVocabulary, TDetector, TDescriptor>::runOnImage(vector<cv::Ke
     if(result.detection())
     {
       cout << "- Loop found with image " << result.match << "!"
-        << endl;
+        <<endl;
       ++m_loop_count;
     }
     else
@@ -299,7 +301,7 @@ void demoDetector<TVocabulary, TDetector, TDescriptor>::run
   params.use_nss = true; // use normalized similarity score instead of raw score
   params.alpha = 0.3; // nss threshold
   params.k = 1; // a loop must be consistent with 1 previous matches
-  params.geom_check = GEOM_DI; // use direct index for geometrical checking
+  params.geom_check = GEOM_NONE; // use direct index for geometrical checking
   params.di_levels = 2; // use two direct index levels
   
   // To verify loops you can select one of the next geometrical checkings:
@@ -329,13 +331,15 @@ void demoDetector<TVocabulary, TDetector, TDescriptor>::run
   // Load the vocabulary to use
   cout << "Loading " << name << " vocabulary..." << endl;
   TVocabulary voc(m_vocfile);
-  
+  cout << "Vocabulary information: " << endl
+       << voc << endl << endl;
   // Initiate loop detector with the vocabulary 
   cout << "Processing sequence..." << endl;
   TDetector detector(voc, params);
   
   // Process images
   vector<cv::KeyPoint> keys;
+  vector<DLoopDetector::KeyPointMap> keymaps;
   vector<TDescriptor> descriptors;
 
   // load image filenames  
@@ -380,14 +384,15 @@ void demoDetector<TVocabulary, TDetector, TDescriptor>::run
     
     // get features
     profiler.profile("features");
-    extractor(im, keys, descriptors);
+    extractor(im, keys,keymaps, descriptors);
+
     profiler.stop();
         
     // add image to the collection and check if there is some loop
     DetectionResult result;
     
     profiler.profile("detection");
-    detector.detectLoop(keys, descriptors, result);
+    detector.detectLoop(keymaps, descriptors, result);
     profiler.stop();
     
     if(result.detection())

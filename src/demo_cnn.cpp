@@ -33,7 +33,7 @@ using namespace std;
 
 // ----------------------------------------------------------------------------
 
-static const char *VOC_FILE = "/resources/vprice_cnn_voc_K10L4.txt";
+static const char *VOC_FILE = "/resources/library_resnet_voc_K10L6.txt";
 static const char *IMAGE_DIR = "/resources/images";
 static const char *POSE_FILE = "/resources/pose.txt";
 static const int IMAGE_W = 224; // image size
@@ -53,7 +53,7 @@ public:
    * @param descriptors descriptors extracted
    */
   virtual void operator()(const cv::Mat &im,
-    vector<cv::KeyPoint> &keys, vector<vector<float> > &descriptors) const;
+    vector<cv::KeyPoint> &keys,vector<DLoopDetector::KeyPointMap> &keymaps, vector<vector<float> > &descriptors) const;
 
 
 };
@@ -93,7 +93,7 @@ int main(int argc, char **argv)
 // ----------------------------------------------------------------------------
 
 void CnnExtractor::operator() (const cv::Mat &im,
-  vector<cv::KeyPoint> &keys, vector<vector<float> > &descriptors) const
+  vector<cv::KeyPoint> &keys,vector<DLoopDetector::KeyPointMap> &keymaps, vector<vector<float> > &descriptors) const
 {
   // extract surfs with opencv
   static cv::Ptr<cv::xfeatures2d::SURF> surf_detector =
@@ -121,6 +121,7 @@ void CnnExtractor::operator() (const cv::Mat &im,
 void extractor_callback(const dloopdetector::FeaturesWithKeyPoints::ConstPtr &msg)
 {
     vector<cv::KeyPoint> keys;
+    vector<DLoopDetector::KeyPointMap> keymaps;
     for(std::vector<dloopdetector::KeyPoint>::const_iterator kp = msg -> keypoints.begin();
         kp != msg-> keypoints.end(); ++ kp)
     {
@@ -136,7 +137,7 @@ void extractor_callback(const dloopdetector::FeaturesWithKeyPoints::ConstPtr &ms
         int offset = i*cols;
         std::copy(data_1d.begin()+offset,data_1d.begin() + offset + cols,descriptors[i].begin());
     }
-    demo->runOnImage(keys,descriptors);
+    demo->runOnImage(keys,keymaps,descriptors);
     cout<<++ cnt << "-> "<<keys.size()<<' '<< descriptors.size()<<'-'<< descriptors[0].size()<<std::endl;
 }
 
