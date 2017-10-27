@@ -15,9 +15,10 @@ class GeometricMatchService:
                                    f.endswith(".jpg") or f.endswith(".png"))])
         self.matcher = CNNGeometricMatcher(use_cuda=False, geometric_model='affine', model_path=model_path,
                                       min_mutual_keypoints=4)
-
+    def start(self):
         s = rospy.Service('match_two_places', MatchTwoPlaces, self.handle_match_two_places)
-
+        print "Ready to match two places."
+        rospy.spin()
     def handle_match_two_places(self,req):
 
         path_imgA = self.imgFileNames[req.a]
@@ -31,4 +32,7 @@ class GeometricMatchService:
         return MatchTwoPlacesResponse(result)
 
 if __name__ == "__main__":
-    rospy.spin()
+    service = GeometricMatchService(model_path="/home/develop/Work/Source_Code/cnngeometric_pytorch/trained_models/best_streetview_checkpoint_adam_affine_grid_loss.pth.tar",
+                                    data_folder="/home/develop/Work/catkin_ws/src/dloopdetector/resources/images")
+
+    service.start()
