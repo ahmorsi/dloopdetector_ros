@@ -43,7 +43,9 @@ enum GeometricalCheck
   /// Use a Flann structure
   GEOM_FLANN,
   /// Do not perform geometrical checking
-  GEOM_NONE
+  GEOM_NONE,
+   /// CNN Geometric Verification
+   GEOM_CNN
 };
 
 /// Reasons for dismissing loops
@@ -93,9 +95,13 @@ struct KeyPointMap
     std::vector<cv::KeyPoint> local_keypoints;
     uint32_t size() const { return local_keypoints.size();}
     cv::KeyPoint getKeyPoint(int ind) const {return local_keypoints[ind];}
+    void addKeyPoint(cv::KeyPoint keypoint) {
+        local_keypoints.push_back(keypoint);
+    }
+    KeyPointMap() {}
     KeyPointMap(cv::KeyPoint keypoint)
     {
-        local_keypoints.push_back(keypoint);
+        this->addKeyPoint(keypoint);
     }
 };
 
@@ -839,6 +845,10 @@ bool TemplatedLoopDetector<TDescriptor, F>::detectLoop(
                   m_image_descriptors[island.best_entry],
                   keys, descriptors);            
               }
+              else if(m_params.geom_check == GEOM_CNN)
+              {
+
+              }
               else // GEOM_NONE, accept the match
               {
                 detection = true;
@@ -1007,6 +1017,10 @@ bool TemplatedLoopDetector<TDescriptor, F>::detectLoop(const std::vector<DLoopDe
                     m_image_keymaps[island.best_entry],
                     m_image_descriptors[island.best_entry],
                     keymaps, descriptors);
+                }
+                else if(m_params.geom_check == GEOM_CNN)
+                {
+                    detection=false;//todo:call CNN Geometric Verification service
                 }
                 else // GEOM_NONE, accept the match
                 {

@@ -33,7 +33,7 @@ using namespace std;
 
 // ----------------------------------------------------------------------------
 
-static const char *VOC_FILE = "/resources/library_resnet_voc_K10L6.txt";
+static const char *VOC_FILE = "/resources/library_cnn_conv3_voc_K10L6.txt";
 static const char *IMAGE_DIR = "/resources/images";
 static const char *POSE_FILE = "/resources/pose.txt";
 static const int IMAGE_W = 224; // image size
@@ -122,11 +122,24 @@ void extractor_callback(const dloopdetector::FeaturesWithKeyPoints::ConstPtr &ms
 {
     vector<cv::KeyPoint> keys;
     vector<DLoopDetector::KeyPointMap> keymaps;
-    for(std::vector<dloopdetector::KeyPoint>::const_iterator kp = msg -> keypoints.begin();
-        kp != msg-> keypoints.end(); ++ kp)
+//    for(std::vector<dloopdetector::KeyPoint>::const_iterator kp = msg -> keypoints.begin();
+//        kp != msg-> keypoints.end(); ++ kp)
+//    {
+//        keys.push_back(cv::KeyPoint(kp->x,kp->y,kp->size));
+//    }
+
+    int sz_keypoints = 0;
+    for(std::vector<dloopdetector::KeyPointMap>::const_iterator kp = msg -> keypointmaps.begin();
+        kp != msg-> keypointmaps.end(); ++ kp)
     {
-        keys.push_back(cv::KeyPoint(kp->x,kp->y,kp->size));
+        DLoopDetector::KeyPointMap keymap;
+        for(std::vector<dloopdetector::KeyPoint>::const_iterator it = kp -> keypoints.begin();
+            it != kp-> keypoints.end(); ++ it)
+            keymap.addKeyPoint(cv::KeyPoint(it->x,it->y,it->size));
+        keymaps.push_back(keymap);
+        sz_keypoints += keymap.size();
     }
+
     int rows = msg -> features.layout.dim[0].size;
     int cols = msg -> features.layout.dim[1].size;
     const std::vector<double> data_1d = msg->features.data;
@@ -138,6 +151,6 @@ void extractor_callback(const dloopdetector::FeaturesWithKeyPoints::ConstPtr &ms
         std::copy(data_1d.begin()+offset,data_1d.begin() + offset + cols,descriptors[i].begin());
     }
     demo->runOnImage(keys,keymaps,descriptors);
-    cout<<++ cnt << "-> "<<keys.size()<<' '<< descriptors.size()<<'-'<< descriptors[0].size()<<std::endl;
+    cout<<++ cnt << "-> "<<keymaps.size()<<' '<<sz_keypoints<<' '<< descriptors.size()<<'-'<< descriptors[0].size()<<std::endl;
 }
 

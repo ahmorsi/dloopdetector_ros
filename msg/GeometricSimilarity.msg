@@ -1,0 +1,3 @@
+uint16 num_mutual_matches
+bool matched
+float32 reprojection_error

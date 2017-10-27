@@ -147,9 +147,9 @@ void demoDetector<TVocabulary, TDetector, TDescriptor>::init(const string &name)
 
     // We are going to change these values individually:
     params.use_nss = true; // use normalized similarity score instead of raw score
-    params.alpha = 0.5; // nss threshold
+    params.alpha = 0.3; // nss threshold
     params.k = 1; // a loop must be consistent with 1 previous matches
-    params.geom_check = GEOM_DI; // use direct index for geometrical checking
+    params.geom_check = GEOM_EXHAUSTIVE; // use direct index for geometrical checking
     params.di_levels = 1; // use two direct index levels
 
     // To verify loops you can select one of the next geometrical checkings:
@@ -301,7 +301,7 @@ void demoDetector<TVocabulary, TDetector, TDescriptor>::run
   params.use_nss = true; // use normalized similarity score instead of raw score
   params.alpha = 0.3; // nss threshold
   params.k = 1; // a loop must be consistent with 1 previous matches
-  params.geom_check = GEOM_NONE; // use direct index for geometrical checking
+  params.geom_check = GEOM_DI; // use direct index for geometrical checking
   params.di_levels = 2; // use two direct index levels
   
   // To verify loops you can select one of the next geometrical checkings:
