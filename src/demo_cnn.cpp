@@ -33,7 +33,7 @@ using namespace std;
 
 // ----------------------------------------------------------------------------
 
-static const char *VOC_FILE = "/resources/library_cnn_conv3_voc_K10L6.txt";
+static const char *VOC_FILE = "/resources/mixed_vocab_Places302_resnet18_K10_L6.txt";
 static const char *IMAGE_DIR = "/resources/images";
 static const char *POSE_FILE = "/resources/pose.txt";
 static const int IMAGE_W = 224; // image size
@@ -72,7 +72,7 @@ int main(int argc, char **argv)
   std::string image_dir = path + IMAGE_DIR;
   std::string pose_file = path + POSE_FILE;
     // prepares the demo
-    demo = new demoDetector<CnnVocabulary, CnnLoopDetector, FCNN::TDescriptor>(voc_file.c_str(), image_dir.c_str(), pose_file.c_str(), IMAGE_W, IMAGE_H);
+    demo = new demoDetector<CnnVocabulary, CnnLoopDetector, FCNN::TDescriptor>(n,voc_file.c_str(), image_dir.c_str(), pose_file.c_str(), IMAGE_W, IMAGE_H);
     demo->init("CNN");
   try
   {

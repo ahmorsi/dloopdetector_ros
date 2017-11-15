@@ -67,6 +67,16 @@ public:
   demoDetector(const std::string &vocfile, const std::string &imagedir,
     const std::string &posefile, int width, int height);
     
+  /**
+   * @param n ROS Node Handle
+   * @param vocfile vocabulary file to load
+   * @param imagedir directory to read images from
+   * @param posefile pose file
+   * @param width image width
+   * @param height image height
+   */
+  demoDetector(ros::NodeHandle& n,const std::string &vocfile, const std::string &imagedir,
+    const std::string &posefile, int width, int height);
   ~demoDetector(){
       delete m_detector;
   }
@@ -114,6 +124,7 @@ protected:
   int m_height;
   int m_loop_count;
   TDetector* m_detector;
+  ros::ServiceClient m_geometric_client;
 };
 
 // ---------------------------------------------------------------------------
@@ -126,6 +137,13 @@ demoDetector<TVocabulary, TDetector, TDescriptor>::demoDetector
     m_width(width), m_height(height)
 {
     m_loop_count = 0;
+}
+template<class TVocabulary, class TDetector, class TDescriptor>
+demoDetector<TVocabulary, TDetector, TDescriptor>::demoDetector
+(ros::NodeHandle &n, const string &vocfile, const string &imagedir, const string &posefile, int width, int height):demoDetector
+                                                                                                                         (vocfile, imagedir, posefile, width, height)
+{
+    m_geometric_client = n.serviceClient<dloopdetector::MatchTwoPlaces>("match_two_places");
 }
 
 template<class TVocabulary, class TDetector, class TDescriptor>
@@ -147,9 +165,9 @@ void demoDetector<TVocabulary, TDetector, TDescriptor>::init(const string &name)
 
     // We are going to change these values individually:
     params.use_nss = true; // use normalized similarity score instead of raw score
-    params.alpha = 0.3; // nss threshold
+    params.alpha = 0.1; // nss threshold
     params.k = 1; // a loop must be consistent with 1 previous matches
-    params.geom_check = GEOM_EXHAUSTIVE; // use direct index for geometrical checking
+    params.geom_check = GEOM_CNN; // use direct index for geometrical checking
     params.di_levels = 1; // use two direct index levels
 
     // To verify loops you can select one of the next geometrical checkings:
@@ -182,7 +200,7 @@ void demoDetector<TVocabulary, TDetector, TDescriptor>::init(const string &name)
     voc.loadFromTextFile(m_vocfile);
     cout << "Vocabulary information: " << endl
          << voc << endl << endl;
-    m_detector = new TDetector(voc, params);
+    m_detector = new TDetector(&(this->m_geometric_client),voc, params);
 
     // prepare visualization windows
     //DUtilsCV::GUI::tWinHandler win = "Current image";

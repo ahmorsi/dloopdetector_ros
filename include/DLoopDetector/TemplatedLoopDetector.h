@@ -15,8 +15,10 @@
 #include <fstream>
 #include <string>
 
+#include "ros/ros.h"
 #include <opencv/cv.h>
-
+#include "dloopdetector/MatchTwoPlaces.h"
+#include "dloopdetector/GeometricSimilarity.h"
 #include "TemplatedVocabulary.h"
 #include "TemplatedDatabase.h"
 #include "QueryResults.h"
@@ -213,6 +215,16 @@ public:
     const Parameters &params = Parameters());
   
   /**
+   * Creates a loop detector with the given parameters and with a BoW2 database
+   * with the given vocabulary
+   * @param p_geometric_client Pointer to ROS Service Client for CNN Geometric Verification
+   * @param voc vocabulary
+   * @param params loop detector parameters
+   */
+  TemplatedLoopDetector(ros::ServiceClient* p_geometric_client,const TemplatedVocabulary<TDescriptor, F> &voc,
+    const Parameters &params = Parameters());
+
+  /**
    * Creates a loop detector with a copy of the given database, but clearing
    * its contents
    * @param db database to copy
@@ -293,6 +305,14 @@ public:
   bool detectLoop(const std::vector<KeyPointMap> &keymaps,
     const std::vector<TDescriptor> &descriptors,
     DetectionResult &match);
+
+  /**
+   * CNN Geometric Verification Service
+   * @param src_id ID of the source image
+   * @param target_id ID of the target image
+   * @return true iff there was match
+   */
+  bool matchCnnGeometrically(int src_id,int target_id);
 
   /**
    * Resets the detector and clears the database, such that the next entry
@@ -424,6 +444,7 @@ protected:
     tTemporalWindow(): nentries(0) {}
   };
   
+  ros::ServiceClient* m_geometric_client;
 protected:
   
   /**
@@ -634,6 +655,13 @@ TemplatedLoopDetector<TDescriptor,F>::TemplatedLoopDetector
     params.geom_check == GEOM_DI, params.di_levels);
   
   m_fsolver.setImageSize(params.image_cols, params.image_rows);
+}
+template<class TDescriptor, class F>
+TemplatedLoopDetector<TDescriptor,F>::TemplatedLoopDetector
+(ros::ServiceClient *p_geometric_client,
+ const TemplatedVocabulary<TDescriptor, F> &voc, const Parameters &params):TemplatedLoopDetector(voc,params)
+{
+    this->m_geometric_client = p_geometric_client;
 }
 
 // --------------------------------------------------------------------------
@@ -847,7 +875,14 @@ bool TemplatedLoopDetector<TDescriptor, F>::detectLoop(
               }
               else if(m_params.geom_check == GEOM_CNN)
               {
-
+                  try{
+                  detection = matchCnnGeometrically((int)entry_id,island.best_entry);
+                  }
+                  catch(...)
+                  {
+                     ROS_ERROR("Failed to call service add_two_ints");
+                     exit(-1);
+                  }
               }
               else // GEOM_NONE, accept the match
               {
@@ -973,7 +1008,7 @@ bool TemplatedLoopDetector<TDescriptor, F>::detectLoop(const std::vector<DLoopDe
           {
             // the best candidate is the one with highest score by now
             match.match = qret[0].Id;
-
+            cout<<"ns_factor: "<< ns_factor<<" Score: "<<qret[0].Score<<endl;
             // compute islands
             vector<tIsland> islands;
             computeIslands(qret, islands);
@@ -1020,7 +1055,14 @@ bool TemplatedLoopDetector<TDescriptor, F>::detectLoop(const std::vector<DLoopDe
                 }
                 else if(m_params.geom_check == GEOM_CNN)
                 {
-                    detection=false;//todo:call CNN Geometric Verification service
+                    try{
+                    detection = matchCnnGeometrically((int)entry_id,island.best_entry);
+                    }
+                    catch(...)
+                    {
+                       ROS_ERROR("Failed to call service match_two_places");
+                       exit(-1);
+                    }
                 }
                 else // GEOM_NONE, accept the match
                 {
@@ -1086,6 +1128,26 @@ bool TemplatedLoopDetector<TDescriptor, F>::detectLoop(const std::vector<DLoopDe
     }
 
     return match.detection();
+}
+// --------------------------------------------------------------------------
+template<class TDescriptor, class F>
+bool TemplatedLoopDetector<TDescriptor, F>::matchCnnGeometrically(int src_id, int target_id)
+{
+    dloopdetector::MatchTwoPlaces srv;
+    dloopdetector::GeometricSimilarity result;
+    srv.request.a = src_id;
+    srv.request.b = target_id;
+    if (this->m_geometric_client->call(srv))
+      {
+        result = srv.response.result;
+        ROS_INFO("Mutual_Matches: %d, Matched: %d, Reprojection_error: %f",
+                 result.num_mutual_matches,result.matched,result.reprojection_error);
+        return result.matched;
+      }
+      else
+      {
+        throw 1;
+      }
 }
 
 // --------------------------------------------------------------------------
