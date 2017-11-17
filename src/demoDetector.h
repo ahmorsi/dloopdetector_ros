@@ -92,7 +92,7 @@ public:
    * @param name demo name
    * @param extractor functor to extract features
    */
-  void runOnImage(vector<cv::KeyPoint> keys,
+  DetectionResult runOnImage(vector<cv::KeyPoint> keys,
   vector<DLoopDetector::KeyPointMap> keymaps,
   vector<TDescriptor> descriptors);
 
@@ -165,7 +165,7 @@ void demoDetector<TVocabulary, TDetector, TDescriptor>::init(const string &name)
 
     // We are going to change these values individually:
     params.use_nss = true; // use normalized similarity score instead of raw score
-    params.alpha = 0.1; // nss threshold
+    params.alpha = 0.3; // nss threshold
     params.k = 1; // a loop must be consistent with 1 previous matches
     params.geom_check = GEOM_CNN; // use direct index for geometrical checking
     params.di_levels = 1; // use two direct index levels
@@ -217,7 +217,7 @@ void demoDetector<TVocabulary, TDetector, TDescriptor>::init(const string &name)
 
 }
 template<class TVocabulary, class TDetector, class TDescriptor>
-void demoDetector<TVocabulary, TDetector, TDescriptor>::runOnImage(vector<cv::KeyPoint> keys,vector<DLoopDetector::KeyPointMap> keymaps, vector<TDescriptor> descriptors)
+DetectionResult demoDetector<TVocabulary, TDetector, TDescriptor>::runOnImage(vector<cv::KeyPoint> keys,vector<DLoopDetector::KeyPointMap> keymaps, vector<TDescriptor> descriptors)
 {
     // add image to the collection and check if there is some loop
     DetectionResult result;
@@ -282,7 +282,7 @@ void demoDetector<TVocabulary, TDetector, TDescriptor>::runOnImage(vector<cv::Ke
     }
 
     cout << endl;
-
+    return result;
 //    // show trajectory
 //    if(i > 0)
 //    {

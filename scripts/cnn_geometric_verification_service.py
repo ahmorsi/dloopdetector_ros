@@ -10,7 +10,7 @@ import argparse
 
 class GeometricMatchService:
     def __init__(self,data_folder,geometric_affine_model,image_shape,geometric_tps_model=None,use_extracted_features=False,arch = 'resnet18',
-                                    featext_weights = None,service_name='match_two_places'):
+                                    featext_weights = None,min_reprojection_error=100,service_name='match_two_places'):
         self.service_name = service_name
         self.data_folder=data_folder
         self.image_shape=image_shape
@@ -18,7 +18,7 @@ class GeometricMatchService:
         self.matcher = CNNGeometricMatcher(use_extracted_features=use_extracted_features, geometric_affine_model=geometric_affine_model,
                                            geometric_tps_model=geometric_tps_model,
                                            arch=arch,featext_weights=featext_weights,
-                                      min_mutual_keypoints=3,min_reprojection_error=100)
+                                      min_mutual_keypoints=3,min_reprojection_error=min_reprojection_error)
     def start(self):
         rospy.init_node('cnn_geometric_node')
         s = rospy.Service(self.service_name, MatchTwoPlaces, self.handle_match_two_places)
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     parser.add_argument('--features-dir', '-f', type=str,
                         required=True, dest="featuresdir",
                         help='Features Output Folder')
-
+    parser.add_argument('--th',type=int,default=100,help='Threshold for Transformation Error')
     parser.add_argument('--use-features',action="store_true",help="Use Extracted Features")
     parser.add_argument('--w', type=int,default=640,required=False,help='Image Width')
     parser.add_argument('--h', type=int,default=480, required=False, help='Image Height')
@@ -65,6 +65,7 @@ if __name__ == "__main__":
                                     geometric_affine_model=args.model_aff,
                                     data_folder=args.featuresdir,
                                     use_extracted_features=args.use_features,
+                                    min_reprojection_error=args.th,
                                     image_shape = (args.h,args.w,3))
 
     service.start()
